@@ -1,0 +1,367 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>SAXS Graph</title>
+
+		<!--<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>-->
+		<script type="text/javascript" src="static/socket.io.js"></script>
+		<link rel="stylesheet" href="static/ui/css/jquery.ui.all.css">
+		<script src="static/jquery-1.7.2.js"></script>
+		<script src="static/ui/jquery.ui.core.js"></script>
+		<script src="static/ui/jquery.ui.widget.js"></script>
+		<script src="static/ui/jquery.ui.mouse.js"></script>
+		<script src="static/ui/jquery.ui.button.js"></script>
+		<script src="static/ui/jquery.ui.sortable.js"></script>
+		<script src="static/ui/jquery.ui.tabs.js"></script>
+		<script src="static/verticalCheckPlugin.js"></script>
+		<script src="static/highcharts/highcharts.js"></script>
+		<script src="static/highcharts/modules/exporting.js"></script>
+
+<script type="text/javascript">
+			
+WEB_SOCKET_SWF_LOCATION = "/static/WebSocketMain.swf";
+WEB_SOCKET_DEBUG = true;
+
+var raw_dat_data;
+var avg_buffer_data;
+var avg_sample_data;
+var avg_sub_data;
+var autowater_data;
+
+var defaultChartSettings = {
+            chart: {
+                renderTo: 'dummy',
+                type: 'scatter',
+                zoomType: 'xy'
+            },
+            title: {
+                text: 'Latest SAXS Data'
+            },
+            xAxis: {
+                title: {
+                    enabled: true,
+                    text: 'q (A-1)'
+                },
+                type: 'logarithmic',
+		gridLineWidth: 1,
+		tickInterval: 0.1,
+		//minorTickInterval: 0.1,
+		startOnTick: false,
+                endOnTick: false,
+                showLastLabel: true
+            },
+            yAxis: {
+                title: {
+                    text: 'Intensity (cm-1)'
+                },
+		gridLineWidth: 1,
+		tickInterval: 0.1,
+		type: 'logarithmic',
+		startOnTick: false,
+		endOnTick: false,
+            },
+            plotOptions: {
+                scatter: {
+                    lineWidth : 2,
+		    marker: {
+                        radius: 2,
+                        states: {
+                            hover: {
+                                enabled: true,
+                                lineColor: 'rgb(100,100,100)'
+                            }
+                        }
+                    },
+                    states: {
+                        hover: {
+                            marker: {
+                                enabled: false
+                            }
+                        }
+                    }
+                }
+            },
+            series: [{
+                name: 'saxs',
+                color: 'rgba(223, 83, 83, .5)'
+                }]
+        };
+
+rawDatSettings = $.extend(deep=true,{},defaultChartSettings);
+avgBufferSettings = $.extend(deep=true,{},defaultChartSettings);
+avgSampleSettings = $.extend(deep=true,{},defaultChartSettings);
+avgSubSettings = $.extend(deep=true,{},defaultChartSettings);
+autowaterSettings = $.extend(deep=true,{},defaultChartSettings);
+	
+
+// socket.io specific code
+var socket = io.connect('/graph');
+
+socket.on('connect', function () {
+});
+
+socket.on('error', function (e) {
+    message('System', e ? e : 'A unknown error occurred');
+});
+
+socket.on('raw_dat', function(data) {
+    raw_dat_data = data;
+	raw_dat_chart.series[0].setData(data.profile);
+	raw_dat_chart.setTitle({text: data.filename});
+});
+
+socket.on('avg_buf', function(data) {
+	avg_buffer_data = data;
+	avg_buffer_chart.series[0].setData(data.profile);
+	avg_buffer_chart.setTitle({text: data.filename});
+});
+
+socket.on('avg_smp', function(data) {
+	avg_sample_data = data;
+	avg_sample_chart.series[0].setData(data.profile);
+	avg_sample_chart.setTitle({text: data.filename});
+});
+
+socket.on('avg_sub', function(data) {
+	avg_sub_data = data;
+	avg_sub_chart.series[0].setData(data.profile);
+	avg_sub_chart.setTitle({text: data.filename});
+});
+
+socket.on('autowater', function(data) {
+    autowater_data = data;
+    autowater_chart.addSeries({data: data.profile});
+    autowater_chart.setTitle({text: data.filename});
+});
+
+function setLinLogAxis(chart, settings, data, axis){
+	chart.destroy();
+	switch (axis)
+	{
+		case 'linx':
+			settings.xAxis.type = 'linear';
+			break;
+		case 'logx':
+			settings.xAxis.type = 'logarithmic';
+			break;
+		case 'liny':
+			settings.yAxis.type = 'linear';
+			break;
+		case 'logy':
+			settings.yAxis.type = 'logarithmic';
+			break;
+	};
+	
+	settings.series[0].data=data.profile;
+	settings.title.text = data.filename;
+	chart = new Highcharts.Chart(settings);
+	return chart;
+};
+
+function setLinLog(chart, axis){
+	switch(chart)
+	{
+		case "raw_dat":
+			raw_dat_chart = setLinLogAxis(raw_dat_chart, rawDatSettings, raw_dat_data, axis);
+			break;
+		case "avg_buffer":
+			avg_buffer_chart = setLinLogAxis(avg_buffer_chart, avgBufferSettings, avg_buffer_data, axis);
+			break;
+		case "avg_sample":
+			avg_sample_chart = setLinLogAxis(avg_sample_chart, avgSampleSettings, avg_sample_data, axis);
+			break;
+		case "avg_sub":
+			avg_sub_chart = setLinLogAxis(avg_sub_chart, avgSubSettings, avg_sub_data, axis);
+			break;
+		case "autowater":
+			autowater_chart = setLinLogAxis(autowater_chart, autowaterSettings, autowater_data, axis);
+			break;
+	};
+	
+};
+
+$(function () {
+
+	$(document).ready(function() {
+
+	$( "#raw_dat_choice_y" ).buttonsetv();
+	$( "#raw_dat_choice_x" ).buttonset();
+	$( "#avg_buffer_choice_y" ).buttonsetv();
+	$( "#avg_buffer_choice_x" ).buttonset();
+	$( "#avg_sample_choice_y" ).buttonsetv();
+	$( "#avg_sample_choice_x" ).buttonset();
+	$( "#avg_sub_choice_y" ).buttonsetv();
+	$( "#avg_sub_choice_x" ).buttonset();
+	$( "#autowater_choice_y" ).buttonsetv();
+	$( "#autowater_choice_x" ).buttonset();
+	
+	$( ".linlog")
+		.button()
+		.click(function() {
+				lastUnderscore = (event.target.id).lastIndexOf('_')
+				chartName = (event.target.id).substring(0,lastUnderscore);
+				axis = (event.target.id).substring(lastUnderscore+1,lastUnderscore+5);
+				setLinLog(chartName,axis);
+			});
+		
+	$( "#tabs" ).tabs({collapsible: true}).find( ".ui-tabs-nav" ).sortable({ axis: "x" });
+		
+	
+	rawDatSettings.chart.renderTo = 'raw_dat_div';
+	raw_dat_chart = new Highcharts.Chart(rawDatSettings);
+	
+	avgBufferSettings.chart.renderTo = 'avg_buffer_div';
+	avg_buffer_chart = new Highcharts.Chart(avgBufferSettings);
+	
+	avgSampleSettings.chart.renderTo = 'avg_sample_div';
+	avg_sample_chart = new Highcharts.Chart(avgSampleSettings);
+	
+	avgSubSettings.chart.renderTo = 'avg_sub_div';
+	avg_sub_chart = new Highcharts.Chart(avgSubSettings);
+	
+    autowaterSettings.chart.renderTo = 'autowater_div';
+	autowater_chart = new Highcharts.Chart(autowaterSettings);
+	
+    });
+    
+});
+</script>
+</head>
+<body>
+
+<div id="tabs">
+	<ul>
+		<li><a href="#tabs-1">Raw Profiles</a></li>
+		<li><a href="#tabs-2">Average Buffer</a></li>
+		<li><a href="#tabs-3">Average Sample</a></li>
+		<li><a href="#tabs-4">Average Subtracted Sample</a></li>
+                <li><a href="#tabs-5">Auto Water Shots</a></li>
+
+	</ul>
+	<div id="tabs-1">
+		<div>
+			<div style="width: 200px; float: left">
+				<form>
+					<div id="raw_dat_choice_y">
+						<input type="radio" id="raw_dat_logy" class="linlog" name="radio" checked="checked"/><label for="raw_dat_logy">Logarithmic</label>
+						<input type="radio" id="raw_dat_liny" class="linlog" name="radio" /><label for="raw_dat_liny">Linear</label>
+					</div>
+				</form>
+			</div>
+			<div style="float: left">
+				<div id="raw_dat_div" style="width: 1200px; height: 600px; margin: 0 auto"></div>
+			</div>
+			<div style="clear: both"></div>
+		</div>
+		<div style="width: 400px; margin-left: auto; margin-right: auto">
+			<form>
+				<div id="raw_dat_choice_x" >
+					<input type="radio" id="raw_dat_logx" class="linlog" name="radio" checked="checked"/><label for="raw_dat_logx">Logarithmic</label>
+					<input type="radio" id="raw_dat_linx" class="linlog" name="radio" /><label for="raw_dat_linx">Linear</label>
+				</div>
+			</form>
+		</div>
+	</div>
+	<div id="tabs-2">
+		<div>
+			<div style="width: 200px; float: left">
+				<form>
+					<div id="avg_buffer_choice_y">
+						<input type="radio" id="avg_buffer_logy" class="linlog" name="radio" checked="checked"/><label for="avg_buffer_logy">Logarithmic</label>
+						<input type="radio" id="avg_buffer_liny" class="linlog" name="radio" /><label for="avg_buffer_liny">Linear</label>
+					</div>
+				</form>
+			</div>
+			<div style="float: left">
+				<div id="avg_buffer_div" style="width: 1200px; height: 600px; margin: 0 auto"></div>
+			</div>
+			<div style="clear: both"></div>
+		</div>
+		<div style="width: 400px; margin-left: auto; margin-right: auto">
+			<form>
+				<div id="avg_buffer_choice_x" >
+					<input type="radio" id="avg_buffer_logx" class="linlog" name="radio" checked="checked"/><label for="avg_buffer_logx">Logarithmic</label>
+					<input type="radio" id="avg_buffer_linx" class="linlog" name="radio" /><label for="avg_buffer_linx">Linear</label>
+				</div>
+			</form>
+		</div>
+		
+	</div>
+	<div id="tabs-3">
+		<div>
+			<div style="width: 200px; float: left">
+				<form>
+					<div id="avg_sample_choice_y">
+						<input type="radio" id="avg_sample_logy" class="linlog" name="radio" checked="checked"/><label for="avg_sample_logy">Logarithmic</label>
+						<input type="radio" id="avg_sample_liny" class="linlog" name="radio" /><label for="avg_sample_liny">Linear</label>
+					</div>
+				</form>
+			</div>
+			<div style="float: left">
+				<div id="avg_sample_div" style="width: 1200px; height: 600px; margin: 0 auto"></div>
+			</div>
+			<div style="clear: both"></div>
+		</div>
+		<div style="width: 400px; margin-left: auto; margin-right: auto">
+			<form>
+				<div id="avg_sample_choice_x" >
+					<input type="radio" id="avg_sample_logx" class="linlog" name="radio" checked="checked"/><label for="avg_sample_logx">Logarithmic</label>
+					<input type="radio" id="avg_sample_linx" class="linlog" name="radio" /><label for="avg_sample_linx">Linear</label>
+				</div>
+			</form>
+		</div>
+	</div>
+	<div id="tabs-4">
+		<div>
+			<div style="width: 200px; float: left">
+				<form>
+					<div id="avg_sub_choice_y">
+						<input type="radio" id="avg_sub_logy" class="linlog" name="radio" checked="checked"/><label for="avg_sub_logy">Logarithmic</label>
+						<input type="radio" id="avg_sub_liny" class="linlog" name="radio" /><label for="avg_sub_liny">Linear</label>
+					</div>
+				</form>
+			</div>
+			<div style="float: left">
+				<div id="avg_sub_div" style="width: 1200px; height: 600px; margin: 0 auto"></div>
+			</div>
+			<div style="clear: both"></div>
+		</div>
+		<div style="width: 400px; margin-left: auto; margin-right: auto">
+			<form>
+				<div id="avg_sub_choice_x" >
+					<input type="radio" id="avg_sub_logx" class="linlog" name="radio" checked="checked"/><label for="avg_sub_logx">Logarithmic</label>
+					<input type="radio" id="avg_sub_linx" class="linlog" name="radio" /><label for="avg_sub_linx">Linear</label>
+				</div>
+			</form>
+		</div>
+	</div>
+	<div id="tabs-5">
+		<div>
+			<div style="width: 200px; float: left">
+				<form>
+					<div id="autowater_choice_y">
+						<input type="radio" id="autowater_logy" class="linlog" name="radio" checked="checked"/><label for="autowater_logy">Logarithmic</label>
+						<input type="radio" id="autowater_liny" class="linlog" name="radio" /><label for="autowater_liny">Linear</label>
+					</div>
+				</form>
+			</div>
+			<div style="float: left">
+				<div id="autowater_div" style="width: 1200px; height: 600px; margin: 0 auto"></div>
+			</div>
+			<div style="clear: both"></div>
+		</div>
+		<div style="width: 400px; margin-left: auto; margin-right: auto">
+			<form>
+				<div id="autowater_choice_x" >
+					<input type="radio" id="autowater_logx" class="linlog" name="radio" checked="checked"/><label for="autowater_logx">Logarithmic</label>
+					<input type="radio" id="autowater_linx" class="linlog" name="radio" /><label for="autowater_linx">Linear</label>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+
+</body>
+</html>
